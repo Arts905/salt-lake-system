@@ -1,0 +1,1408 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>运城盐湖·导览</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Lora:ital,wght@0,400;0,600;0,700;1,400&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&display=swap" rel="stylesheet">
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+  <style>
+    :root {
+      /* Palette */
+      --color-ink: #111111;
+      --color-paper: #F9F9F7;
+      --color-alert: #CC0000;
+      --color-accent-pink: #E8A5A5;
+      --color-accent-sulfur: #D4C16F;
+      --color-border: #111111;
+      --color-dim: #F0F0F0;
+      
+      /* Typography */
+      --font-display: 'Playfair Display', serif;
+      --font-body: 'Lora', serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      
+      /* Spacing */
+      --header-height: 56px;
+      --bottom-nav-height: 64px;
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      margin: 0;
+      background-color: var(--color-paper);
+      color: var(--color-ink);
+      font-family: var(--font-body);
+      overflow-x: hidden;
+      padding-top: var(--header-height);
+      padding-bottom: var(--bottom-nav-height);
+    }
+
+    /* Textures */
+    .newsprint-texture {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 9999;
+      opacity: 0.05;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+    }
+
+    /* App Header */
+    .app-header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: var(--header-height);
+      background: var(--color-paper);
+      border-bottom: 2px solid var(--color-ink);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 1rem;
+      z-index: 100;
+    }
+    
+    .app-logo {
+      font-family: var(--font-display);
+      font-weight: 900;
+      font-size: 1.2rem;
+      text-transform: uppercase;
+      letter-spacing: -0.5px;
+    }
+
+    .app-status {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--color-ink);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .weather-icon {
+      font-size: 1rem;
+    }
+
+    /* Marquee (Top of content) */
+    .marquee-container {
+      background: var(--color-ink);
+      color: var(--color-paper);
+      overflow: hidden;
+      white-space: nowrap;
+      padding: 4px 0;
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      font-size: 0.75rem;
+    }
+    .marquee-content {
+      display: inline-block;
+      animation: marquee 60s linear infinite;
+    }
+    @keyframes marquee {
+      0% { transform: translateX(100%); }
+      100% { transform: translateX(-100%); }
+    }
+
+    /* Hero / Search Section */
+    .hero-section {
+      padding: 1.5rem;
+      background: #e5e5e5;
+      position: relative;
+      overflow: hidden;
+      border-bottom: 1px solid var(--color-ink);
+    }
+    .hero-bg-pattern {
+      position: absolute;
+      top:0; left:0; width:100%; height:100%;
+      background-image: radial-gradient(circle, #111 20%, transparent 20%);
+      background-size: 8px 8px;
+      opacity: 0.05;
+      pointer-events: none;
+    }
+
+    .search-box {
+      position: relative;
+      margin-top: 1rem;
+    }
+    .search-input {
+      width: 100%;
+      padding: 12px 12px 12px 40px;
+      border: 2px solid var(--color-ink);
+      background: var(--color-paper);
+      font-family: var(--font-body);
+      font-size: 1rem;
+      border-radius: 0;
+      outline: none;
+      transition: box-shadow 0.2s;
+    }
+    .search-input:focus {
+      box-shadow: 4px 4px 0 var(--color-ink);
+    }
+    .search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 1.2rem;
+    }
+
+    /* Filters */
+    .filter-bar {
+      display: flex;
+      gap: 0.5rem;
+      padding: 1rem;
+      overflow-x: auto;
+      border-bottom: 1px solid var(--color-ink);
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    .filter-bar::-webkit-scrollbar { display: none; }
+    
+    .filter-chip {
+      padding: 8px 16px; /* Larger touch target */
+      border: 1px solid var(--color-ink);
+      border-radius: 20px;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      white-space: nowrap;
+      cursor: pointer;
+      background: transparent;
+      transition: all 0.2s;
+    }
+    .filter-chip.active {
+      background: var(--color-ink);
+      color: var(--color-paper);
+    }
+    .filter-chip:active {
+      transform: scale(0.95);
+    }
+
+    /* Cards List */
+    .cards-container {
+      padding: 1rem;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+    
+    @media (min-width: 640px) {
+      .cards-container {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+    @media (min-width: 1024px) {
+      .cards-container {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+
+    .card {
+      border: 1px solid var(--color-ink);
+      background: var(--color-paper);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      cursor: pointer;
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+    
+    .card:active {
+      transform: scale(0.98);
+      background: var(--color-dim);
+    }
+    
+    .card-img-wrapper {
+      position: relative;
+      width: 100%;
+      padding-top: 60%;
+      border-bottom: 1px solid var(--color-ink);
+      overflow: hidden;
+      background: #ccc;
+    }
+    .card-img {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: filter 0.3s;
+      filter: sepia(20%) contrast(1.1);
+    }
+
+    .card-content {
+      padding: 1rem;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 0.5rem;
+    }
+    
+    .card-title {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 1.25rem;
+      margin: 0;
+      line-height: 1.2;
+    }
+
+    .card-badge {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      background: var(--color-ink);
+      color: var(--color-paper);
+      padding: 2px 6px;
+      text-transform: uppercase;
+    }
+    .card-badge.red { background: var(--color-alert); }
+
+    .card-meta {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: #666;
+      margin-bottom: 0.8rem;
+      display: flex;
+      gap: 1rem;
+    }
+
+    .card-desc {
+      font-size: 0.9rem;
+      color: #333;
+      margin: 0;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    /* Bottom Navigation (Dummy) */
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: var(--bottom-nav-height);
+      background: var(--color-paper);
+      border-top: 2px solid var(--color-ink);
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      z-index: 100;
+    }
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 8px;
+      color: #999;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      cursor: pointer;
+    }
+    .nav-item.active {
+      color: var(--color-ink);
+    }
+    .nav-icon {
+      font-size: 1.5rem;
+    }
+
+    /* Map View */
+    #map-view {
+      display: none;
+      width: 100%;
+      height: calc(100vh - var(--header-height) - var(--bottom-nav-height) - 30px); /* Adjust for marquee */
+      position: relative;
+    }
+    #map-view.active {
+      display: block;
+    }
+    
+    /* Leaflet Customization for Vintage Style */
+    .leaflet-container {
+      background: #e5e5e5 !important;
+      font-family: var(--font-mono) !important;
+    }
+    .leaflet-popup-content-wrapper {
+      border-radius: 0 !important;
+      background: var(--color-paper) !important;
+      border: 1px solid var(--color-ink) !important;
+      box-shadow: 4px 4px 0 var(--color-ink) !important;
+      color: var(--color-ink) !important;
+    }
+    .leaflet-popup-tip {
+      background: var(--color-ink) !important;
+    }
+
+    .custom-marker-icon {
+      border-radius: 4px; /* Square with slight radius */
+      box-shadow: 2px 2px 0 var(--color-ink);
+      border: 2px solid var(--color-ink);
+      background: white;
+      overflow: hidden;
+    }
+    .custom-marker-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    /* Detail View Overlay */
+    .detail-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: var(--color-paper);
+      z-index: 2000;
+      display: none;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+    .detail-overlay.visible {
+      display: flex;
+      animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes slideIn {
+      from { transform: translateX(100%); }
+      to { transform: translateX(0); }
+    }
+
+    .detail-header {
+      position: sticky;
+      top: 0;
+      background: var(--color-paper);
+      border-bottom: 2px solid var(--color-ink);
+      padding: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      z-index: 10;
+    }
+    .back-btn {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      padding: 0;
+      color: var(--color-ink);
+    }
+    .detail-title {
+      font-family: var(--font-display);
+      font-weight: 900;
+      font-size: 1.2rem;
+      text-transform: uppercase;
+      flex: 1;
+    }
+
+    .detail-hero-img {
+      width: 100%;
+      height: 300px;
+      object-fit: cover;
+      border-bottom: 1px solid var(--color-ink);
+    }
+    
+    .detail-content {
+      padding: 1.5rem;
+    }
+    
+    .detail-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 2rem;
+      padding: 1rem;
+      border: 1px solid var(--color-ink);
+      background: #f0f0f0;
+    }
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+    }
+    .stat-label {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: #666;
+      text-transform: uppercase;
+    }
+    .stat-value {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 1.1rem;
+    }
+
+    .detail-actions {
+      display: flex;
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+    .action-btn {
+      flex: 1;
+      padding: 1rem;
+      border: 2px solid var(--color-ink);
+      background: var(--color-ink);
+      color: var(--color-paper);
+      font-family: var(--font-mono);
+      font-weight: 700;
+      text-transform: uppercase;
+      cursor: pointer;
+      text-align: center;
+    }
+    .action-btn:active {
+      transform: scale(0.98);
+      opacity: 0.9;
+    }
+    .action-btn.secondary {
+      background: transparent;
+      color: var(--color-ink);
+    }
+
+    .quest-option {
+      display: flex;
+      align-items: center;
+      padding: 1rem;
+      border: 1px solid var(--color-ink);
+      background: var(--color-paper);
+      cursor: pointer;
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      transition: background 0.2s;
+    }
+    .quest-option:hover {
+      background: #e5e5e5;
+    }
+    .quest-option input {
+      margin-right: 1rem;
+      transform: scale(1.5);
+    }
+
+  </style>
+</head>
+<body>
+
+  <div class="newsprint-texture"></div>
+
+  <!-- Header -->
+  <header class="app-header">
+    <div class="app-logo">SALT LAKE GUIDE</div>
+    <div class="app-status" id="header-status">
+      <span>LOADING...</span>
+    </div>
+  </header>
+
+  <!-- Marquee -->
+  <div class="marquee-container">
+    <div class="marquee-content" id="marquee-text">
+      SYSTEM ONLINE • GEOLOGICAL ARCHIVE LOADED • WAITING FOR DATA...
+    </div>
+  </div>
+
+  <!-- Main Scrollable Content -->
+  <main id="main-view">
+    <!-- Hero & Search -->
+    <div class="hero-section">
+      <div class="hero-bg-pattern"></div>
+      <h1 style="font-family: var(--font-display); font-size: 2rem; margin: 0; line-height: 1.1;">Discover the<br>Ancient Lake</h1>
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" class="search-input" placeholder="Search archive..." id="search-input">
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filter-bar" id="filter-bar">
+      <div class="filter-chip active" data-filter="all">ALL</div>
+      <div class="filter-chip" data-filter="景点">SCENIC</div>
+      <div class="filter-chip" data-filter="博物馆">MUSEUM</div>
+      <div class="filter-chip" data-filter="观景台">VIEW</div>
+      <div class="filter-chip" data-filter="湿地">WETLAND</div>
+    </div>
+
+    <!-- Content List -->
+    <div class="cards-container" id="cards-container">
+      <div class="card">
+        <div class="card-content">
+          <div class="card-title">Loading...</div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Saved View -->
+  <div id="saved-view" style="display: none;">
+    <div class="hero-section" style="background: var(--color-ink); color: var(--color-paper);">
+      <h1 style="font-family: var(--font-display); font-size: 2rem; margin: 0;">MY ARCHIVE</h1>
+      <p style="font-family: var(--font-mono); font-size: 0.8rem; margin: 0.5rem 0 0 0; opacity: 0.8;">YOUR SAVED LOCATIONS</p>
+      <button onclick="generateTour()" style="margin-top: 1rem; padding: 8px 16px; border: 1px solid var(--color-paper); background: transparent; color: var(--color-paper); font-family: var(--font-mono); cursor: pointer; text-transform: uppercase; font-size: 0.8rem;">
+        Generate Tour Route ↗
+      </button>
+    </div>
+    <div class="cards-container" id="saved-container">
+      <!-- Saved cards injected here -->
+    </div>
+  </div>
+
+  <!-- Community View -->
+  <div id="community-view" style="display: none;">
+    <div class="hero-section" style="background: #e5e5e5; color: var(--color-ink); border-bottom: 1px solid var(--color-ink);">
+      <h1 style="font-family: var(--font-display); font-size: 2rem; margin: 0;">COMMUNITY</h1>
+      <p style="font-family: var(--font-mono); font-size: 0.8rem; margin: 0.5rem 0 0 0; opacity: 0.8;">SHARE YOUR DISCOVERIES</p>
+    </div>
+    <div class="cards-container" id="community-container">
+      <div style="text-align:center; padding:2rem; font-family:var(--font-mono);">LOADING POSTS...</div>
+    </div>
+    <!-- FAB for Post -->
+    <div class="fab" onclick="showPostModal()" style="bottom: 90px; right: 24px; position: fixed; width: 56px; height: 56px; border-radius: 50%; background: var(--color-ink); color: white; display: flex; align-items: center; justify-content: center; box-shadow: 4px 4px 0 var(--color-alert); border: 2px solid var(--color-ink); font-size: 2rem; cursor: pointer; z-index: 200;">+</div>
+  </div>
+
+  <!-- Map View -->
+  <div id="map-view"></div>
+
+  <!-- Detail View Overlay -->
+  <div class="detail-overlay" id="detail-view">
+    <div class="detail-header">
+      <button class="back-btn" onclick="hideDetail()">←</button>
+      <div class="detail-title">ARCHIVE DETAIL</div>
+    </div>
+    <div id="detail-body">
+      <!-- Content injected by JS -->
+    </div>
+  </div>
+
+  <!-- Login Overlay -->
+  <div class="detail-overlay" id="auth-modal" style="z-index: 4000; display: flex;">
+    <div class="detail-header" style="justify-content: center;">
+      <div class="detail-title" style="flex: 0 auto;">WELCOME TO SALT LAKE</div>
+    </div>
+    <div style="padding: 2rem; display: flex; flex-direction: column; gap: 1.5rem; justify-content: center; height: 100%;">
+      <div style="text-align: center; margin-bottom: 1rem;">
+        <h2 style="font-family: var(--font-display); font-size: 1.5rem;">ACCESS ARCHIVE</h2>
+        <p style="font-family: var(--font-mono); font-size: 0.8rem; color: #666;">LOGIN TO SAVE & SHARE</p>
+      </div>
+      
+      <div class="search-box" style="margin: 0;">
+        <input type="text" class="search-input" placeholder="USERNAME" id="auth-username">
+      </div>
+      <div class="search-box" style="margin: 0;">
+        <input type="password" class="search-input" placeholder="PASSWORD" id="auth-password">
+      </div>
+      
+      <button class="action-btn" onclick="handleLogin()">LOGIN</button>
+      <button class="action-btn secondary" onclick="handleRegister()">REGISTER</button>
+      
+      <div style="text-align: center; margin-top: 1rem;">
+        <span onclick="document.getElementById('auth-modal').style.display='none'" style="text-decoration: underline; cursor: pointer; font-family: var(--font-mono); font-size: 0.8rem;">Continue as Guest</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Questionnaire Modal -->
+  <div class="detail-overlay" id="quest-modal" style="z-index: 3500; display: none;">
+    <div class="detail-header" style="justify-content: center;">
+      <div class="detail-title" style="flex: 0 auto;">PERSONAL PREFERENCES</div>
+    </div>
+    <div style="padding: 2rem; display: flex; flex-direction: column; gap: 1.5rem; justify-content: center; height: 100%;">
+      <div style="text-align: center; margin-bottom: 1rem;">
+        <h2 style="font-family: var(--font-display); font-size: 1.5rem;">WHAT INTERESTS YOU?</h2>
+        <p style="font-family: var(--font-mono); font-size: 0.8rem; color: #666;">SELECT ALL THAT APPLY</p>
+      </div>
+      
+      <div id="quest-options" style="display: flex; flex-direction: column; gap: 10px;">
+        <label class="quest-option">
+          <input type="checkbox" value="拍照打卡"> 
+          <span>📸 PHOTOGRAPHY (拍照打卡)</span>
+        </label>
+        <label class="quest-option">
+          <input type="checkbox" value="体验盐湖景观"> 
+          <span>🏞 LANDSCAPE (体验盐湖景观)</span>
+        </label>
+        <label class="quest-option">
+          <input type="checkbox" value="了解历史文化"> 
+          <span>🏛 HISTORY (了解历史文化)</span>
+        </label>
+        <label class="quest-option">
+          <input type="checkbox" value="放松身心"> 
+          <span>🧘 RELAXATION (放松身心)</span>
+        </label>
+        <label class="quest-option">
+          <input type="checkbox" value="观鸟活动"> 
+          <span>🦅 BIRD WATCHING (观鸟活动)</span>
+        </label>
+      </div>
+      
+      <button class="action-btn" onclick="submitPreferences()">SAVE & GET RECOMMENDATIONS</button>
+      
+      <div style="text-align: center; margin-top: 1rem;">
+        <span onclick="document.getElementById('quest-modal').style.display='none'" style="text-decoration: underline; cursor: pointer; font-family: var(--font-mono); font-size: 0.8rem;">Skip for now</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Post Modal -->
+  <div class="detail-overlay" id="post-modal" style="z-index: 3000;">
+    <div class="detail-header">
+      <button class="back-btn" onclick="hidePostModal()">←</button>
+      <div class="detail-title">NEW POST</div>
+    </div>
+    <div style="padding: 1.5rem;">
+      <form id="post-form" onsubmit="handlePostSubmit(event)">
+        <div style="margin-bottom: 1.5rem;">
+          <label style="display:block; font-family:var(--font-mono); margin-bottom:0.5rem;">PHOTO</label>
+          <input type="file" id="post-file" accept="image/*" required style="width:100%; font-family:var(--font-mono);">
+        </div>
+        <div style="margin-bottom: 1.5rem;">
+          <label style="display:block; font-family:var(--font-mono); margin-bottom:0.5rem;">CAPTION</label>
+          <textarea id="post-caption" rows="3" style="width:100%; padding:0.5rem; border:2px solid var(--color-ink); font-family:var(--font-body);"></textarea>
+        </div>
+        <div style="margin-bottom: 1.5rem;">
+          <label style="display:block; font-family:var(--font-mono); margin-bottom:0.5rem;">YOUR NAME</label>
+          <input type="text" id="post-author" value="Explorer" style="width:100%; padding:0.5rem; border:2px solid var(--color-ink); font-family:var(--font-mono);">
+        </div>
+        <button type="submit" class="action-btn" style="width:100%;">PUBLISH</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Bottom Nav -->
+  <nav class="bottom-nav">
+    <div class="nav-item active" onclick="switchTab('home')">
+      <span class="nav-icon">☗</span>
+      <span>HOME</span>
+    </div>
+    <div class="nav-item" onclick="switchTab('map')">
+      <span class="nav-icon">◎</span>
+      <span>MAP</span>
+    </div>
+    <div class="nav-item" onclick="switchTab('community')">
+      <span class="nav-icon">☺</span>
+      <span>COMMUNITY</span>
+    </div>
+    <div class="nav-item" onclick="switchTab('saved')">
+      <span class="nav-icon">★</span>
+      <span>SAVED</span>
+    </div>
+  </nav>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <script>
+    // State
+    let allData = [];
+    let currentFilter = 'all';
+    let searchQuery = '';
+    let map = null;
+    let markersLayer = null;
+    let currentUser = null; // Store user info {id, username, preferences}
+
+    // DOM Elements
+    const cardsContainer = document.getElementById('cards-container');
+    const marqueeText = document.getElementById('marquee-text');
+    const searchInput = document.getElementById('search-input');
+    const filterChips = document.querySelectorAll('.filter-chip');
+    const detailView = document.getElementById('detail-view');
+    const detailBody = document.getElementById('detail-body');
+    const headerStatus = document.getElementById('header-status');
+    const mainView = document.getElementById('main-view');
+    const mapView = document.getElementById('map-view');
+    const savedView = document.getElementById('saved-view');
+    const savedContainer = document.getElementById('saved-container');
+    const communityView = document.getElementById('community-view');
+    const communityContainer = document.getElementById('community-container');
+    const postModal = document.getElementById('post-modal');
+    const navItems = document.querySelectorAll('.nav-item');
+
+    // Utils
+    const formatDate = () => {
+      const now = new Date();
+      return now.toISOString().split('T')[0];
+    };
+
+    // Tab Switching
+    function switchTab(tab) {
+        // Update Nav UI
+        navItems.forEach((item, index) => {
+            if ( (tab === 'home' && index === 0) || 
+                 (tab === 'map' && index === 1) || 
+                 (tab === 'community' && index === 2) ||
+                 (tab === 'saved' && index === 3) ) {
+                item.classList.add('active');
+            } else {
+                item.classList.remove('active');
+            }
+        });
+
+        // Reset Views
+        mainView.style.display = 'none';
+        mapView.classList.remove('active');
+        savedView.style.display = 'none';
+        communityView.style.display = 'none';
+
+        // Toggle Views
+        if (tab === 'home') {
+            mainView.style.display = 'block';
+        } else if (tab === 'map') {
+            mapView.classList.add('active');
+            initMap(); // Lazy init
+        } else if (tab === 'community') {
+            communityView.style.display = 'block';
+            fetchPosts();
+        } else if (tab === 'saved') {
+            savedView.style.display = 'block';
+            renderSaved();
+        }
+    }
+
+    // Community Logic
+    async function fetchPosts() {
+        try {
+            const res = await fetch('/api/community/posts');
+            if (res.ok) {
+                const posts = await res.json();
+                renderPosts(posts);
+            }
+        } catch (e) {
+            console.error(e);
+            communityContainer.innerHTML = '<div style="text-align:center; padding:2rem; font-family:var(--font-mono);">ERROR LOADING POSTS</div>';
+        }
+    }
+
+    function renderPosts(posts) {
+        communityContainer.innerHTML = '';
+        if (posts.length === 0) {
+            communityContainer.innerHTML = '<div style="text-align:center; padding:2rem; font-family:var(--font-mono);">NO POSTS YET. BE THE FIRST!</div>';
+            return;
+        }
+
+        posts.forEach(post => {
+            const card = document.createElement('div');
+            card.className = 'card';
+            
+            // Format Date
+            const date = new Date(post.created_at).toLocaleDateString();
+            
+            card.innerHTML = `
+              <div class="card-img-wrapper" style="padding-top: 100%;">
+                <img src="${post.image_url}" class="card-img" loading="lazy" alt="Community Post">
+              </div>
+              <div class="card-content">
+                <div class="card-header" style="align-items: center;">
+                  <div style="font-family: var(--font-display); font-weight: bold; font-size: 1rem;">@${post.author_name}</div>
+                  <span class="card-badge">${date}</span>
+                </div>
+                <p class="card-desc" style="-webkit-line-clamp: 4;">${post.caption || ''}</p>
+                <div style="margin-top: 1rem; padding-top: 0.5rem; border-top: 1px solid var(--color-ink); display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 0.8rem;">
+                    <span>♥ ${post.likes} LIKES</span>
+                    <button onclick="likePost(${post.id}, this)" style="background:none; border:none; cursor:pointer; font-size: 1.2rem;">♡</button>
+                </div>
+              </div>
+            `;
+            communityContainer.appendChild(card);
+        });
+    }
+
+    async function likePost(id, btn) {
+        try {
+            const res = await fetch(`/api/community/posts/${id}/like`, { method: 'POST' });
+            if (res.ok) {
+                const data = await res.json();
+                btn.previousElementSibling.textContent = `♥ ${data.likes} LIKES`;
+                btn.textContent = '♥';
+                btn.style.color = 'var(--color-alert)';
+            }
+        } catch(e) { console.error(e); }
+    }
+
+    function showPostModal() {
+        postModal.classList.add('visible');
+    }
+
+    function hidePostModal() {
+        postModal.classList.remove('visible');
+    }
+
+    async function handlePostSubmit(e) {
+        e.preventDefault();
+        
+        const fileInput = document.getElementById('post-file');
+        const captionInput = document.getElementById('post-caption');
+        const authorInput = document.getElementById('post-author');
+        const btn = e.target.querySelector('button');
+        
+        if (!fileInput.files[0]) return;
+        
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        formData.append('caption', captionInput.value);
+        formData.append('author_name', authorInput.value);
+        
+        btn.disabled = true;
+        btn.textContent = 'UPLOADING...';
+        
+        try {
+            const res = await fetch('/api/community/posts', {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (res.ok) {
+                alert('Posted successfully!');
+                hidePostModal();
+                e.target.reset();
+                fetchPosts(); // Refresh list
+            } else {
+                alert('Upload failed.');
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Error uploading post.');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'PUBLISH';
+        }
+    }
+
+    // Map Logic
+    function initMap() {
+        if (map) {
+            setTimeout(() => map.invalidateSize(), 100); 
+            return;
+        }
+        
+        try {
+            // Default to Yuncheng Salt Lake center if no data
+            const center = [35.03, 111.02]; 
+            
+            map = L.map('map-view', {
+                zoomControl: false, 
+                attributionControl: false
+            }).setView(center, 12);
+
+            // Add CartoDB Positron (Light/Gray) Tile Layer
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                maxZoom: 19,
+                subdomains: 'abcd'
+            }).addTo(map);
+            
+            renderMapMarkers();
+        } catch (e) {
+            console.error('Map init error:', e);
+        }
+    }
+
+    function renderMapMarkers() {
+        if (!map) return;
+        if (markersLayer) markersLayer.clearLayers();
+
+        const markers = [];
+        
+        allData.forEach(item => {
+            if (item.latitude && item.longitude) {
+                const imgPath = item.ui_cover_image || '/static/attractions/default.jpg';
+                
+                // Create Custom Icon with Image
+                const customIcon = L.divIcon({
+                    className: 'custom-marker-container', 
+                    html: `<div class="custom-marker-icon" style="width: 40px; height: 40px;">
+                             <img src="${imgPath}" class="custom-marker-img" onerror="this.src='/static/attractions/default.jpg'">
+                          </div>`,
+                    iconSize: [40, 40],
+                    iconAnchor: [20, 40],
+                    popupAnchor: [0, -40]
+                });
+
+                const marker = L.marker([item.latitude, item.longitude], {
+                    icon: customIcon
+                }).addTo(map);
+
+                // Popup Content with Image
+                const popupContent = `
+                    <div style="font-family: var(--font-mono); min-width: 200px;">
+                        <div style="height: 100px; width: 100%; margin-bottom: 8px; overflow: hidden; border-bottom: 1px solid #111;">
+                           <img src="${imgPath}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='/static/attractions/default.jpg'">
+                        </div>
+                        <h4 style="margin: 0 0 4px 0; font-family: var(--font-display); text-transform: uppercase;">${item.name}</h4>
+                        <div style="font-size: 0.8rem; margin-bottom: 8px; color: #666;">${item.category}</div>
+                        <div style="display: flex; gap: 8px;">
+                            <button onclick="showDetailFromMap(${item.id})" style="flex:1; background:var(--color-ink); color:white; border:none; padding:6px; cursor:pointer; font-weight:bold;">VIEW</button>
+                            <button onclick="startNavigation(${item.latitude}, ${item.longitude}, '${item.name}')" style="flex:1; background:var(--color-alert); color:white; border:none; padding:6px; cursor:pointer; font-weight:bold;">GO ↗</button>
+                        </div>
+                    </div>
+                `;
+                
+                marker.bindPopup(popupContent);
+                markers.push(marker);
+            }
+        });
+
+        if (markers.length > 0) {
+            markersLayer = L.featureGroup(markers).addTo(map);
+            map.fitBounds(markersLayer.getBounds().pad(0.1));
+        } else {
+             markersLayer = L.featureGroup([]).addTo(map);
+        }
+    }
+    
+    // Helper to find item by ID for map popup
+    window.showDetailFromMap = (id) => {
+        const item = allData.find(d => d.id === id);
+        if (item) showDetail(item);
+    };
+
+    // Route Planning
+    function generateTour() {
+        const saved = getSavedItems();
+        if (saved.length < 2) {
+            alert('Please save at least 2 locations to generate a route.');
+            return;
+        }
+        
+        // Switch to map
+        switchTab('map');
+        
+        // Wait for map to init
+        setTimeout(() => {
+            if (!map) return;
+            
+            // Clear existing markers
+            if (markersLayer) markersLayer.clearLayers();
+            
+            // Create route points
+            const points = saved.map(item => [item.latitude, item.longitude]);
+            const latLngs = points.filter(p => p[0] && p[1]);
+            
+            if (latLngs.length < 2) return;
+            
+            // Draw Polyline
+            const polyline = L.polyline(latLngs, {
+                color: 'var(--color-alert)',
+                weight: 4,
+                opacity: 0.7,
+                dashArray: '10, 10', 
+                lineJoin: 'round'
+            }).addTo(map);
+            
+            // Add markers for stops
+            const markers = [];
+            saved.forEach((item, index) => {
+                if (item.latitude && item.longitude) {
+                     const marker = L.marker([item.latitude, item.longitude]).addTo(map);
+                     marker.bindPopup(`
+                        <div style="font-family: var(--font-mono); text-align:center;">
+                            <b>STOP ${index + 1}</b><br>
+                            ${item.name}
+                        </div>
+                     `);
+                     markers.push(marker);
+                }
+            });
+            
+            // Fit bounds
+            map.fitBounds(polyline.getBounds().pad(0.2));
+            
+            alert(`Tour route generated with ${saved.length} stops!`);
+        }, 500);
+    }
+    
+    // Auth Logic
+    async function handleLogin() {
+        const u = document.getElementById('auth-username').value;
+        const p = document.getElementById('auth-password').value;
+        if (!u || !p) return alert('Please enter username and password');
+        
+        try {
+            const res = await fetch('/api/user/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username: u, password: p})
+            });
+            if (res.ok) {
+                currentUser = await res.json();
+                document.getElementById('auth-modal').style.display = 'none';
+                document.getElementById('post-author').value = currentUser.username; // Pre-fill post author
+                alert('Welcome back, ' + currentUser.username);
+                
+                // Check if user has preferences, if not show questionnaire
+                if (!currentUser.preferences) {
+                    document.getElementById('quest-modal').style.display = 'flex';
+                } else {
+                    // Load personalized recommendations
+                    fetchRecommendations();
+                }
+                
+                // Refresh saved if needed
+                if (savedView.style.display === 'block') renderSaved();
+            } else {
+                alert('Invalid credentials');
+            }
+        } catch(e) { console.error(e); alert('Login error'); }
+    }
+
+    async function handleRegister() {
+        const u = document.getElementById('auth-username').value;
+        const p = document.getElementById('auth-password').value;
+        if (!u || !p) return alert('Please enter username and password');
+        
+        try {
+            const res = await fetch('/api/user/register', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username: u, password: p})
+            });
+            if (res.ok) {
+                currentUser = await res.json();
+                document.getElementById('auth-modal').style.display = 'none';
+                document.getElementById('post-author').value = currentUser.username;
+                alert('Account created! Welcome ' + currentUser.username);
+                
+                // Show questionnaire for new users
+                document.getElementById('quest-modal').style.display = 'flex';
+            } else {
+                const err = await res.json();
+                alert('Registration failed: ' + (err.detail || 'Unknown error'));
+            }
+        } catch(e) { console.error(e); alert('Registration error'); }
+    }
+    
+    // Questionnaire Logic
+    async function submitPreferences() {
+        const checkboxes = document.querySelectorAll('#quest-options input[type="checkbox"]:checked');
+        const selected = Array.from(checkboxes).map(cb => cb.value);
+        
+        if (selected.length === 0) {
+            alert('Please select at least one interest.');
+            return;
+        }
+        
+        try {
+            const res = await fetch('/api/user/preferences', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({user_id: currentUser.id, preferences: selected})
+            });
+            
+            if (res.ok) {
+                const data = await res.json();
+                currentUser.preferences = data.preferences;
+                document.getElementById('quest-modal').style.display = 'none';
+                alert('Preferences saved! Updating recommendations...');
+                fetchRecommendations(); // Refresh home with personalized data
+            } else {
+                alert('Failed to save preferences');
+            }
+        } catch(e) { console.error(e); }
+    }
+
+    // Saved/Favorites Logic (Updated to use API)
+    let localSavedCache = []; // Cache for UI
+
+    async function fetchSavedItems() {
+        if (!currentUser) return []; // Or use localStorage fallback if desired
+        try {
+            const res = await fetch(`/api/user/${currentUser.id}/favorites`);
+            if (res.ok) {
+                localSavedCache = await res.json();
+                return localSavedCache;
+            }
+        } catch(e) { console.error(e); }
+        return [];
+    }
+    
+    function isSaved(id) {
+        if (!currentUser) return false;
+        return localSavedCache.some(item => item.id === id);
+    }
+    
+    async function toggleSave(item) {
+        if (!currentUser) {
+            document.getElementById('auth-modal').style.display = 'flex';
+            return;
+        }
+        
+        const isCurrentlySaved = isSaved(item.id);
+        
+        try {
+            if (isCurrentlySaved) {
+                await fetch(`/api/user/${currentUser.id}/favorites/${item.id}`, { method: 'DELETE' });
+                localSavedCache = localSavedCache.filter(s => s.id !== item.id);
+                alert('Removed from Archive');
+            } else {
+                await fetch('/api/user/favorites', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({user_id: currentUser.id, attraction_id: item.id})
+                });
+                localSavedCache.push(item);
+                alert('Saved to Archive');
+            }
+            
+            updateSaveButton(item.id);
+            if (savedView.style.display === 'block') {
+                renderSaved();
+            }
+        } catch(e) { console.error(e); alert('Error updating favorite'); }
+    }
+    
+    function updateSaveButton(id) {
+        const btn = document.getElementById('btn-save');
+        if (!btn) return;
+        
+        if (isSaved(id)) {
+            btn.textContent = 'SAVED ★';
+            btn.style.background = 'var(--color-ink)';
+            btn.style.color = 'var(--color-paper)';
+        } else {
+            btn.textContent = 'SAVE';
+            btn.style.background = 'transparent';
+            btn.style.color = 'var(--color-ink)';
+        }
+    }
+    
+    async function renderSaved() {
+        if (!currentUser) {
+            savedContainer.innerHTML = '<div style="font-family: var(--font-mono); text-align: center; padding: 2rem;">PLEASE LOGIN TO VIEW ARCHIVE</div>';
+            return;
+        }
+        
+        const saved = await fetchSavedItems();
+        savedContainer.innerHTML = '';
+        
+        if (saved.length === 0) {
+            savedContainer.innerHTML = '<div style="font-family: var(--font-mono); text-align: center; padding: 2rem;">NO SAVED ITEMS</div>';
+            return;
+        }
+        
+        saved.forEach(item => {
+            savedContainer.appendChild(createCardElement(item, true));
+        });
+    }
+
+    // Render Cards (Home)
+    function renderCards() {
+        cardsContainer.innerHTML = '';
+        
+        const filtered = allData.filter(item => {
+            const matchFilter = currentFilter === 'all' || item.category === currentFilter;
+            const matchSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                (item.description && item.description.toLowerCase().includes(searchQuery.toLowerCase()));
+            return matchFilter && matchSearch;
+        });
+
+        if (filtered.length === 0) {
+            cardsContainer.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 2rem; font-family: var(--font-mono);">NO RECORDS FOUND</div>';
+            return;
+        }
+
+        filtered.forEach(item => {
+            cardsContainer.appendChild(createCardElement(item));
+        });
+    }
+
+    function createCardElement(item, isSavedCard = false) {
+        const isHotspot = item.ui_is_photo_hotspot;
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.onclick = () => showDetail(item);
+        
+        const imgPath = item.ui_cover_image || '/static/attractions/default.jpg';
+        
+        card.innerHTML = `
+          <div class="card-img-wrapper">
+            <img src="${imgPath}" class="card-img" loading="lazy" alt="${item.name}" onerror="this.onerror=null;this.src='/static/attractions/default.jpg'">
+            ${isHotspot ? '<div style="position:absolute; top:0; right:0; background:var(--color-alert); color:white; padding:4px 8px; font-family:var(--font-mono); font-size:0.7rem;">HOTSPOT</div>' : ''}
+          </div>
+          <div class="card-content">
+            <div class="card-header">
+              <h3 class="card-title">${item.name}</h3>
+              <span class="card-badge ${isSavedCard ? '' : (item.category === '摄影型' ? 'red' : '')}">${isSavedCard ? 'SAVED' : (item.category || 'LOC')}</span>
+            </div>
+            <div class="card-meta">
+              <span>★ ${item.composite_score.toFixed(1)}</span>
+              <span>POP: ${(item.popularity * 100).toFixed(0)}%</span>
+            </div>
+            <p class="card-desc">${item.ui_subtitle || item.description || 'No description available.'}</p>
+          </div>
+        `;
+        return card;
+    }
+
+    // Detail View Logic
+    function showDetail(item) {
+      const imgPath = item.ui_cover_image || '/static/attractions/default.jpg';
+      
+      detailBody.innerHTML = `
+        <div style="background:#e5e5e5; min-height:300px;">
+          <img src="${imgPath}" class="detail-hero-img" alt="${item.name}" onerror="this.onerror=null;this.src='/static/attractions/default.jpg'">
+        </div>
+        <div class="detail-content">
+          <div style="font-family:var(--font-mono); color:var(--color-alert); margin-bottom:0.5rem;">ID: ${item.id} • ${item.category}</div>
+          <h1 style="font-family:var(--font-display); font-size:2.5rem; margin:0 0 1rem 0; line-height:1;">${item.name}</h1>
+          
+          <div class="detail-stats">
+            <div class="stat-item">
+              <span class="stat-label">COMPOSITE SCORE</span>
+              <span class="stat-value">${item.composite_score.toFixed(2)}</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">POPULARITY</span>
+              <span class="stat-value">${(item.popularity * 100).toFixed(0)}%</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">ACCESSIBILITY</span>
+              <span class="stat-value">${(item.accessibility * 100).toFixed(0)}%</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">THEMATIC</span>
+              <span class="stat-value">${(item.thematic * 100).toFixed(0)}%</span>
+            </div>
+          </div>
+
+          <p style="font-size:1.1rem; line-height:1.6; margin-bottom:2rem;">
+            ${item.description || 'No detailed description available in the archive.'}
+          </p>
+
+          <div class="detail-actions">
+            <button class="action-btn" onclick="startNavigation(${item.latitude}, ${item.longitude}, '${item.name}')">NAVIGATE</button>
+            <button id="btn-save" class="action-btn secondary">SAVE</button>
+          </div>
+        </div>
+      `;
+      
+      // Bind save event with closure to pass item
+      document.getElementById('btn-save').onclick = () => toggleSave(item);
+      // Init button state
+      updateSaveButton(item.id);
+      
+      detailView.classList.add('visible');
+      document.body.style.overflow = 'hidden'; // Prevent background scrolling
+    }
+
+    function hideDetail() {
+      detailView.classList.remove('visible');
+      document.body.style.overflow = '';
+    }
+    
+    // 导航功能
+    function startNavigation(lat, lng, name) {
+        if (!lat || !lng) {
+            alert('该景点暂无坐标信息');
+            return;
+        }
+        
+        if (/MicroMessenger/.test(navigator.userAgent)) {
+             alert('请点击右上角菜单，选择"在浏览器打开"以启动导航');
+             return;
+        }
+        
+        const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+        const isAndroid = /Android/i.test(navigator.userAgent);
+        
+        if (isIOS || isAndroid) {
+             window.location.href = `https://uri.amap.com/marker?position=${lng},${lat}&name=${name}`;
+        } else {
+             window.open(`https://www.amap.com/search?query=${name}`, '_blank');
+        }
+    }
+
+    // Event Listeners
+    searchInput.addEventListener('input', (e) => {
+      searchQuery = e.target.value.trim();
+      renderCards();
+    });
+
+    filterChips.forEach(chip => {
+      chip.addEventListener('click', () => {
+        filterChips.forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        currentFilter = chip.dataset.filter;
+        renderCards();
+      });
+    });
+
+    // Data Fetching
+    async function init() {
+      // Try to load initial data
+      await fetchRecommendations();
+      
+      try {
+        const [wRes, pRes] = await Promise.all([
+            fetch('/api/weather/now2h').catch(e => null),
+            fetch('/api/prediction/today').catch(e => null)
+        ]);
+        
+        // ... (rest of marquee logic) ...
+        
+        let mContent = `SYSTEM ONLINE • ${formatDate()} • `;
+        if (wRes && wRes.ok) {
+            const wData = await wRes.json();
+            if (wData.now) {
+                const temp = wData.now.temp || '--';
+                const text = wData.now.text || 'Clear';
+                // 简单的图标映射
+                let icon = '☀';
+                if (text.includes('云') || text.includes('Cloud')) icon = '☁';
+                if (text.includes('雨') || text.includes('Rain')) icon = '🌧';
+                if (text.includes('雪') || text.includes('Snow')) icon = '❄';
+                
+                // 更新 Header 天气
+                headerStatus.innerHTML = `
+                  <span class="weather-icon">${icon}</span>
+                  <span>${temp}°C ${text}</span>
+                `;
+                
+                mContent += `TEMP: ${temp}°C WIND: ${wData.now.windDir || '--'} • `;
+            }
+        }
+        if (pRes && pRes.ok) {
+            const pData = await pRes.json();
+            if (pData && pData.length > 0) {
+                const top = pData.sort((a, b) => b.score - a.score)[0];
+                mContent += `★ RECOMMEND: ${top.lake_name} (${top.score}) • `;
+            }
+        }
+        marqueeText.textContent = mContent + mContent;
+
+      } catch (e) {
+        console.error("Init error", e);
+        marqueeText.textContent = "CONNECTION ERROR • CHECK NETWORK";
+      }
+    }
+    
+    async function fetchRecommendations() {
+        let url = '/api/recommend';
+        if (currentUser && currentUser.preferences) {
+            url = `/api/recommend/personalized?user_id=${currentUser.id}`;
+        }
+        
+        try {
+            const res = await fetch(url);
+            if (res.ok) {
+                allData = await res.json();
+                renderCards();
+                
+                // Update Hero Title if personalized
+                if (currentUser && currentUser.preferences) {
+                    document.querySelector('.hero-section h1').innerHTML = 'Recommended<br>For You';
+                }
+            }
+        } catch(e) { console.error(e); }
+    }
+
+    init();
+
+  </script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+pydantic
+SQLAlchemy
+requests
+python-dotenv
+apscheduler
+opencv-python-headless
+numpy
+psycopg2-binary
+pytest
+oss2

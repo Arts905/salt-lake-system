@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  backend:
+    build: .
+    container_name: salt_lake_backend
+    ports:
+      - "8085:8085"
+    volumes:
+      - ./storage:/app/storage
+      - ./data.db:/app/data.db
+    environment:
+      - DATABASE_URL=sqlite:///data.db
+    restart: unless-stopped
