@@ -68,29 +68,36 @@ def root():
 
 @app.on_event("startup")
 def on_startup():
+    print("Startup: Begin")
     try:
         # Check if we are in Vercel/Serverless
         is_vercel = os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME")
+        print(f"Startup: Is Vercel? {is_vercel}")
         
         # In Vercel, we might skip heavy initialization or only do essential DB checks
         # But since we use /tmp/data.db, it's empty every time, so we MUST init data.
         # We just need to be fast.
         
         # 初始化数据库
+        print("Startup: Creating Tables...")
         Base.metadata.create_all(bind=engine)
         
         # 导入更多模型
         from app.db.models_attractions import Attraction
         from app.db.models_poi import PointOfInterest
         Base.metadata.create_all(bind=engine)
+        print("Startup: Tables Created")
         
         # Only start scheduler if NOT in serverless (Serverless functions freeze, so scheduler is useless/harmful)
         if not is_vercel:
+            print("Startup: Starting Scheduler...")
             start_scheduler()
             
         # 初始化示例数据 (Consider making this lighter or async if possible, but for now just keep it)
+        print("Startup: Initing Data...")
         init_sample_attractions()
         init_points_of_interest()
+        print("Startup: Done")
         
     except Exception as e:
         print(f"Startup Error (Non-critical for Vercel demo): {e}")
