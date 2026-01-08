@@ -12,7 +12,11 @@ from app.db.crud_realtime import save_realtime_index
 import os
 from datetime import datetime
 import numpy as np
-import cv2
+
+try:
+    import cv2
+except ImportError:
+    cv2 = None
 
 router = APIRouter()
 
@@ -62,11 +66,30 @@ async def upload_snapshot(lake_id: int = Form(...), file: UploadFile = File(...)
             raise HTTPException(status_code=400, detail="空文件")
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         dir_path = "storage/snapshots"
-        os.makedirs(dir_path, exist_ok=True)
+        try:
+            os.makedirs(dir_path, exist_ok=True)
+        except Exception:
+            # Vercel read-only fallback
+            dir_path = "/tmp"
+            
         filename = f"lake{lake_id}_{ts}.jpg"
         file_path = os.path.join(dir_path, filename)
         with open(file_path, "wb") as f:
             f.write(contents)
+            
+        # Check OpenCV availability
+        if cv2 is None:
+             # Serverless fallback: Return a mock success response
+            return RealtimeIndex(
+                lake_id=lake_id,
+                lake_name=f"{lake_id}号盐湖",
+                score=80,
+                captured_at=datetime.now().isoformat(),
+                image_path=file_path,
+                reason="Serverless模式：图片已接收，但OpenCV未安装，跳过分析。",
+                factors={"image_analysis": {"mock": True}},
+            )
+            
         # 直接在内存中解码并分析
         arr = np.frombuffer(contents, dtype=np.uint8)
         img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
