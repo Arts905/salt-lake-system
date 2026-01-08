@@ -3,14 +3,9 @@ from datetime import datetime, timedelta
 import logging
 from sqlalchemy import func
 
-from app.services.weather_client import get_forecast
-from app.services.prediction_model import predict_for_lakes
-from app.services.realtime_index import compute_and_store_realtime_index
-from app.db.session import SessionLocal
-from app.db.crud import save_predictions
-from app.db.crud_subscriptions import get_all_subscriptions
-from app.db.models import RealtimeIndexRecord
-from app.db.models_poi import PointOfInterest
+# Lazy imports moved inside functions to prevent import loops or side effects
+# from app.services.weather_client import get_forecast
+# ...
 
 scheduler = BackgroundScheduler()
 logger = logging.getLogger("scheduler")
@@ -26,6 +21,8 @@ def _parse_iso(s: str) -> datetime:
 
 def _check_and_trigger_push(db, preds):
     """检查订阅阈值并打印模拟推送日志。"""
+    from app.db.crud_subscriptions import get_all_subscriptions
+    
     subs = get_all_subscriptions(db)
     now = datetime.now()
     within_2h = now + timedelta(hours=2)
@@ -44,6 +41,12 @@ def _check_and_trigger_push(db, preds):
                     )
 
 def refresh_predictions():
+    from app.db.session import SessionLocal
+    from app.db.models_poi import PointOfInterest
+    from app.services.weather_client import get_forecast
+    from app.services.prediction_model import predict_for_lakes
+    from app.db.crud import save_predictions
+    
     db = SessionLocal()
     try:
         # 从数据库动态加载所有点位
@@ -68,6 +71,11 @@ from app.utils.ui_templates import UI_TEMPLATES
 
 def check_daily_recommendations():
     """每日推荐检查任务 (8:00, 16:00)"""
+    from app.db.session import SessionLocal
+    from app.db.models_poi import PointOfInterest
+    from app.services.realtime_index import compute_and_store_realtime_index
+    from app.db.models import RealtimeIndexRecord
+    
     logger.info("开始每日推荐检查...")
     db = SessionLocal()
     try:

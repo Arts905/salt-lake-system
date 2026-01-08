@@ -51,12 +51,16 @@ app.include_router(predictions_router, prefix="/api/prediction", tags=["predicti
 from app.api.routes.weather import router as weather_router
 app.include_router(weather_router, prefix="/api/weather", tags=["weather"])
 
-app.include_router(subscriptions_router, prefix="/api", tags=["subscribe"])
-app.include_router(attractions_router, prefix="/api", tags=["attractions"])
-app.include_router(sensors_router, prefix="/api", tags=["sensors"])
-app.include_router(recommend_router, prefix="/api", tags=["recommend"])
-app.include_router(community_router, prefix="/api/community", tags=["community"])
-app.include_router(user_router, prefix="/api/user", tags=["user"])
+# Try-Catch around router includes to allow partial startup
+try:
+    app.include_router(subscriptions_router, prefix="/api", tags=["subscribe"])
+    app.include_router(attractions_router, prefix="/api", tags=["attractions"])
+    app.include_router(sensors_router, prefix="/api", tags=["sensors"])
+    app.include_router(recommend_router, prefix="/api", tags=["recommend"])
+    app.include_router(community_router, prefix="/api/community", tags=["community"])
+    app.include_router(user_router, prefix="/api/user", tags=["user"])
+except Exception as e:
+    print(f"Warning: Failed to include some routers: {e}")
 
 # 根路径跳转：开发到 /docs，生产到静态首页
 from fastapi.responses import RedirectResponse
