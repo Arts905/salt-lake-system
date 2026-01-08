@@ -9,9 +9,9 @@ from app.db.models_attractions import Attraction
 from app.utils.ui_templates import format_for_ui
 from app.schemas.poi import PointRecommendation
 
-# Auto-create tables
-User.metadata.create_all(bind=engine)
-UserFavorite.metadata.create_all(bind=engine)
+# Auto-create tables moved to main.py startup event
+# User.metadata.create_all(bind=engine)
+# UserFavorite.metadata.create_all(bind=engine)
 
 router = APIRouter()
 

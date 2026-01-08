@@ -12,8 +12,7 @@ from app.utils.oss import upload_file_to_oss
 from pydantic import BaseModel
 from datetime import datetime
 
-# Auto-create table
-CommunityPost.metadata.create_all(bind=engine)
+# Auto-create table moved to main.py startup event
 
 router = APIRouter()
 
@@ -38,8 +37,13 @@ def get_db():
 
 # Local storage fallback
 UPLOAD_DIR = "storage/community"
-if not os.path.exists(UPLOAD_DIR):
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
+try:
+    if not os.path.exists(UPLOAD_DIR):
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
+except Exception:
+    # If read-only filesystem (Vercel), we might fail here. 
+    # Fallback to /tmp only when actually writing.
+    pass
 
 @router.get("/posts", response_model=List[PostResponse])
 def get_posts(db: Session = Depends(get_db)):

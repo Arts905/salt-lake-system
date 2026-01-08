@@ -25,16 +25,28 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount("/static/attractions", StaticFiles(directory="storage/attractions"), name="attractions")
-# Community Images
-if not os.path.exists("storage/community"):
-    os.makedirs("storage/community", exist_ok=True)
-app.mount("/static/community", StaticFiles(directory="storage/community"), name="community")
+# Helper to safe mount
+def safe_mount(path: str, dir_path: str, name: str):
+    if os.path.exists(dir_path):
+        app.mount(path, StaticFiles(directory=dir_path), name=name)
+    else:
+        print(f"Warning: Directory {dir_path} not found. Skipping mount for {path}")
 
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
-app.mount("/snapshots", StaticFiles(directory="storage/snapshots"), name="snapshots")
+safe_mount("/static/attractions", "storage/attractions", "attractions")
+
+# Community Images
+try:
+    if not os.path.exists("storage/community"):
+        os.makedirs("storage/community", exist_ok=True)
+except Exception as e:
+    print(f"Warning: Could not create storage/community: {e}")
+
+safe_mount("/static/community", "storage/community", "community")
+safe_mount("/static", "app/static", "static")
+safe_mount("/snapshots", "storage/snapshots", "snapshots")
 # 新增：提供更简单的 /attractions 路径，避免与 /static 嵌套挂载冲突
-app.mount("/attractions", StaticFiles(directory="storage/attractions"), name="attractions2")
+safe_mount("/attractions", "storage/attractions", "attractions2")
+
 app.include_router(predictions_router, prefix="/api/prediction", tags=["prediction"])
 from app.api.routes.weather import router as weather_router
 app.include_router(weather_router, prefix="/api/weather", tags=["weather"])
@@ -56,16 +68,19 @@ def root():
 
 @app.on_event("startup")
 def on_startup():
-    # 初始化数据库（开发用SQLite），生产建议迁移到PostgreSQL
-    Base.metadata.create_all(bind=engine)
-    # 导入景点模型以确保表被创建
-    from app.db.models_attractions import Attraction
-    from app.db.models_poi import PointOfInterest
-    Base.metadata.create_all(bind=engine)
-    start_scheduler()
-    # 初始化示例景点数据
-    init_sample_attractions()
-    init_points_of_interest()
+    try:
+        # 初始化数据库（开发用SQLite），生产建议迁移到PostgreSQL
+        Base.metadata.create_all(bind=engine)
+        # 导入景点模型以确保表被创建
+        from app.db.models_attractions import Attraction
+        from app.db.models_poi import PointOfInterest
+        Base.metadata.create_all(bind=engine)
+        start_scheduler()
+        # 初始化示例景点数据
+        init_sample_attractions()
+        init_points_of_interest()
+    except Exception as e:
+        print(f"Startup Error (Non-critical for Vercel demo): {e}")
 
 
 @app.on_event("shutdown")
