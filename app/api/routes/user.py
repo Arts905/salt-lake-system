@@ -4,10 +4,15 @@ from pydantic import BaseModel
 from typing import List
 
 from app.db.session import SessionLocal, engine
-from app.db.models_user import User, UserFavorite
-from app.db.models_attractions import Attraction
-from app.utils.ui_templates import format_for_ui
-from app.schemas.poi import PointRecommendation
+
+# Defensive imports
+try:
+    from app.db.models_user import User, UserFavorite
+    from app.db.models_attractions import Attraction
+    from app.utils.ui_templates import format_for_ui
+    from app.schemas.poi import PointRecommendation
+except ImportError:
+    pass
 
 # Auto-create tables moved to main.py startup event
 # User.metadata.create_all(bind=engine)

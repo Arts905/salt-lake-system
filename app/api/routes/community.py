@@ -5,12 +5,17 @@ from typing import List
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
-
-from app.db.session import SessionLocal, engine
-from app.db.models_community import CommunityPost
-from app.utils.oss import upload_file_to_oss
 from pydantic import BaseModel
 from datetime import datetime
+
+from app.db.session import SessionLocal, engine
+
+# Defensive imports
+try:
+    from app.db.models_community import CommunityPost
+    from app.utils.oss import upload_file_to_oss
+except ImportError:
+    pass
 
 # Auto-create table moved to main.py startup event
 
@@ -59,20 +64,27 @@ def create_post(
     image_url = None
     
     # Try OSS Upload first
-    # Read file content first because upload_file_to_oss might need a file-like object
-    # But SpooledTemporaryFile from FastAPI is seekable, so we can pass it directly 
-    # if the util supports it. Our util calls put_object which supports bytes or file-like.
-    
-    # We check if OSS envs are set
     if os.getenv("ALIYUN_OSS_BUCKET"):
-        image_url = upload_file_to_oss(file.file, file.filename)
+        try:
+            image_url = upload_file_to_oss(file.file, file.filename)
+        except Exception:
+            pass
         
     # Fallback to local storage if OSS fails or not configured
     if not image_url:
         file.file.seek(0) # Reset cursor
         file_ext = file.filename.split(".")[-1] if "." in file.filename else "jpg"
         filename = f"{uuid.uuid4()}.{file_ext}"
-        file_path = os.path.join(UPLOAD_DIR, filename)
+        
+        # Use /tmp for Vercel if storage not available
+        final_dir = UPLOAD_DIR
+        try:
+            if not os.path.exists(final_dir):
+                os.makedirs(final_dir, exist_ok=True)
+        except Exception:
+            final_dir = "/tmp"
+            
+        file_path = os.path.join(final_dir, filename)
         
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)

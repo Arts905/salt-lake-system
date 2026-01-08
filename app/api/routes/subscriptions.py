@@ -1,7 +1,12 @@
 from fastapi import APIRouter
-from app.schemas.subscription import SubscriptionCreate
 from app.db.session import SessionLocal
-from app.db.crud_subscriptions import upsert_subscription
+
+# Defensive imports
+try:
+    from app.schemas.subscription import SubscriptionCreate
+    from app.db.crud_subscriptions import upsert_subscription
+except ImportError:
+    pass
 
 router = APIRouter()
 

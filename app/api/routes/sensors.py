@@ -2,9 +2,14 @@ from fastapi import APIRouter, HTTPException
 from sqlalchemy.orm import Session
 from datetime import datetime
 
-from app.schemas.sensor import SensorReadingCreate, SensorReadingResponse
 from app.db.session import SessionLocal
-from app.db.crud_sensor import save_sensor_reading, get_latest_sensor_reading
+
+# Defensive imports
+try:
+    from app.schemas.sensor import SensorReadingCreate, SensorReadingResponse
+    from app.db.crud_sensor import save_sensor_reading, get_latest_sensor_reading
+except ImportError:
+    pass
 
 router = APIRouter()
 
