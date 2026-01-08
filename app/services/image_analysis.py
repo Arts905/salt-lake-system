@@ -1,6 +1,10 @@
-import cv2
 import numpy as np
 from typing import Dict
+
+try:
+    import cv2
+except ImportError:
+    cv2 = None
 
 
 # 重新定义：分区域分析（湖面+天空），并侧重湖面颜色
@@ -17,6 +21,21 @@ def compute_color_features(img_bgr: np.ndarray) -> Dict[str, float]:
     - saturation_mean（与 lake_saturation 一致，用于兼容旧逻辑）
     - red_ratio, pink_ratio（与湖面区域一致，用于兼容旧逻辑）
     """
+    if cv2 is None:
+        # 如果没有 OpenCV，返回默认全0特征
+        return {
+            "lake_saturation": 0.0,
+            "lake_red_ratio": 0.0,
+            "lake_pink_ratio": 0.0,
+            "lake_pink_vivid_ratio": 0.0,
+            "sky_blue_ratio": 0.0,
+            "sky_brightness_mean": 0.0,
+            "sky_whiteness_ratio": 0.0,
+            "saturation_mean": 0.0,
+            "red_ratio": 0.0,
+            "pink_ratio": 0.0,
+        }
+
     if img_bgr is None or img_bgr.size == 0:
         return {
             "lake_saturation": 0.0,
@@ -26,7 +45,6 @@ def compute_color_features(img_bgr: np.ndarray) -> Dict[str, float]:
             "sky_blue_ratio": 0.0,
             "sky_brightness_mean": 0.0,
             "sky_whiteness_ratio": 0.0,
-            # 兼容旧字段
             "saturation_mean": 0.0,
             "red_ratio": 0.0,
             "pink_ratio": 0.0,
