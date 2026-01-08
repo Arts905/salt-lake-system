@@ -69,16 +69,29 @@ def root():
 @app.on_event("startup")
 def on_startup():
     try:
-        # 初始化数据库（开发用SQLite），生产建议迁移到PostgreSQL
+        # Check if we are in Vercel/Serverless
+        is_vercel = os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME")
+        
+        # In Vercel, we might skip heavy initialization or only do essential DB checks
+        # But since we use /tmp/data.db, it's empty every time, so we MUST init data.
+        # We just need to be fast.
+        
+        # 初始化数据库
         Base.metadata.create_all(bind=engine)
-        # 导入景点模型以确保表被创建
+        
+        # 导入更多模型
         from app.db.models_attractions import Attraction
         from app.db.models_poi import PointOfInterest
         Base.metadata.create_all(bind=engine)
-        start_scheduler()
-        # 初始化示例景点数据
+        
+        # Only start scheduler if NOT in serverless (Serverless functions freeze, so scheduler is useless/harmful)
+        if not is_vercel:
+            start_scheduler()
+            
+        # 初始化示例数据 (Consider making this lighter or async if possible, but for now just keep it)
         init_sample_attractions()
         init_points_of_interest()
+        
     except Exception as e:
         print(f"Startup Error (Non-critical for Vercel demo): {e}")
 
